@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:kafka="http://www.mulesoft.org/schema/mule/kafka"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/kafka http://www.mulesoft.org/schema/mule/kafka/current/mule-kafka.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="b68e1c9e-ccf2-4c2d-a07d-921ee155b1c7" >
+		<db:my-sql-connection host="127.0.0.1" port="3306" user="root" password="root" database="affable" />
+	</db:config>
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="7a60729c-a503-4a2d-847d-37000b711e32" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<kafka:kafka-producer-config name="Apache_Kafka_Producer_configuration" doc:name="Apache Kafka Producer configuration" doc:id="703eeb42-7be1-49bb-ab5b-deefc31112d7" >
+		<kafka:basic-kafka-producer-connection bootstrapServers="192.168.0.51:9092" />
+	</kafka:kafka-producer-config>
+	<file:config name="File_Config" doc:name="File Config" doc:id="2244117c-1aa5-4d4c-a3e5-e350839a4b2b" >
+		<file:connection workingDir="/home/chetan/" />
+	</file:config>
+	<flow name="affableFlow" doc:id="b9ec97e7-beec-4d1d-a8bb-434a9044b759" >
+		<http:listener doc:name="Listener" doc:id="c065c04e-ad78-4650-801d-8e07b3b94d8f" config-ref="HTTP_Listener_config" path="/influencers"/>
+		<db:select doc:name="Select" doc:id="9d427237-3192-4b7d-86eb-e37df99270be" config-ref="Database_Config">
+			<db:sql>select * from influencers</db:sql>
+		</db:select>
+		<batch:job jobName="affableBatch_Job" doc:id="f6f99956-92b0-4c25-b34b-a435830cc34a" blockSize="4000">
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="f16064d7-9f83-471d-8711-a26cabe3e820" >
+					<ee:transform doc:name="Transform Message" doc:id="c67a72cd-0bd4-460d-a89d-2784ccd51f63" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+					<logger level="INFO" doc:name="Logger" doc:id="c3d3b02e-9831-4523-aca1-c788663a1c29" message="#[payload ]"/>
+					<kafka:producer doc:name="Publish Message" doc:id="31c5b4eb-845c-45af-ba47-82ae7ea20f55" config-ref="Apache_Kafka_Producer_configuration" topic="affable" key="#[now()]"/>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete >
+				<logger level="INFO" doc:name="Logger" doc:id="587b0999-7335-469b-b610-9d18c80727cc" />
+			</batch:on-complete>
+		</batch:job>
+		<ee:transform doc:name="Transform Message" doc:id="785ea96d-e04f-4d27-a14b-5dafbe60d95e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
