@@ -4,7 +4,7 @@
 		module="affable$sources"
 		revision="0.1"
 		status="integration"
-		publication="20190110072323"
+		publication="20190113202412"
 	/>
 	<configurations>
 		<conf name="compile" visibility="public" description=""/>

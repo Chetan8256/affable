@@ -14,17 +14,18 @@ import org.apache.kafka.common.TopicPartition
 import org.apache.spark.sql.cassandra._
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import com.datastax.driver.core.utils.UUIDs
 import org.apache.spark.sql.functions.udf
 
 //bin/spark-submit --packages org.json4s:json4s-native_2.11:3.6.3,com.datastax.spark:spark-cassandra-connector_2.11:2.4.0,org.apache.spark:spark-streaming-kafka-0-10_2.11:2.1.1 --master spark://127.0.0.1:7077 --class Influencers --deploy-mode client /Users/cruise/Documents/developer/affable/target/scala-2.11/affable_2.11-0.1.jar
 //create keyspace affable with replication = {'class':'SimpleStrategy', 'replication_factor':1};
-//create table affable.influencers (id counter ,pk int, username text, "followerCount" int, "followingCount" int, createdat timestamp, primary key (id));
+//create table affable.influencers (id UUID, pk int, username text, "followerCount" int, "followingCount" int, createdat timestamp, primary key (id));
 //select * from influencers;
 
 
 object Influencers {
 
-	case class Influencers(var id:String, var createdat:String ,pk : String, username : String, followerCount : String, followingCount : String )
+	case class Influencers(id:java.util.UUID, createdat:String ,pk: BigInt, username : String, followerCount : BigInt, followingCount : BigInt)
 
 	def main( args : Array [ String ] ) {
 
@@ -35,7 +36,7 @@ object Influencers {
 		val sc = new SparkContext(conf)
 
 
-		val ssc = new StreamingContext(sc, Seconds(2))
+		val ssc = new StreamingContext(sc, Seconds(15))
 
 
 		val spark = SparkSession
@@ -62,7 +63,7 @@ object Influencers {
 		)
 
 		val info = ( str : String ) => {
-			scala.io.Source.fromURL ( "http://192.168.0.53:3000/api/v1/influencers/" + str ).mkString
+			scala.io.Source.fromURL ( "http://192.168.0.55:3000/api/v1/influencers/" + str ).mkString
 		}
 		/*
 		val encrypt: String => String = (str: String) => {
@@ -82,6 +83,8 @@ object Influencers {
 			val df = spark.read.json(rdd)
 			val columns = df.columns
 
+			df.show()
+
 			val rddMap = df.rdd.map { r =>
 				val map = scala.collection.mutable.Map[String, String]()
 
@@ -93,32 +96,22 @@ object Influencers {
 
 			val infulencer_details = rddMap.map { r =>
 				implicit val formats = DefaultFormats
-				val json = info ( r("pk").toString() )
+				val json = info ( r("INFLUENCER_ID").toString() )
 
 				val md = java.security.MessageDigest.getInstance("SHA-1")
-				val id = md.digest(r("pk").toString().getBytes("UTF-8")).map("%02x".format(_)).mkString
+				val id = md.digest(r("INFLUENCER_ID").toString().getBytes("UTF-8")).map("%02x".format(_)).mkString("")
 
-				//Influencers = encryptUDF(r(0).toString).alias("id")
-
-				//var row = parse ( json ).extract[Influencers]
-				//row.id = id.toString
-				//row.createdat = format.format(Calendar.getInstance().getTime)
-
-
-				//val id = id.toString
 				val createdat = format.format(Calendar.getInstance().getTime)
-				val rowimmutable = parse ( json ).values.asInstanceOf[scala.collection.immutable.Map[String, Any]]
+				val rowimmutable = parse ( json ).values.asInstanceOf[scala.collection.immutable.Map[String, String]]
 				val row = Map(rowimmutable.toSeq: _*)
-				println(row)
-				row
-				//val createdat = format.format(Calendar.getInstance().getTime)
-				//Influencers(id, createdat.toString, row("pk").asInstanceOf[String], row("username").asInstanceOf[String], row("followerCount").asInstanceOf[String], row("followingCount").asInstanceOf[String])
+
+				Influencers(UUIDs.timeBased(), createdat.toString, row("pk").asInstanceOf[BigInt], row("username"), row("followerCount").asInstanceOf[BigInt], row("followingCount").asInstanceOf[BigInt])
 
 			}
 
-			infulencer_details.take(10).foreach(println)
+			//infulencer_details.take(10).foreach(println)
 
-			//infulencer_details.saveToCassandra ( "affable", "influencers", SomeColumns("id", "createdat", "pk", "username", "followerCount", "followingCount") )
+			infulencer_details.saveToCassandra ( "affable", "influencers", SomeColumns("id", "createdat", "pk", "username", "followerCount", "followingCount") )
 
 		}
 
