@@ -29,3 +29,13 @@ bin/spark-submit --packages org.json4s:json4s-native_2.11:3.6.3,com.datastax.spa
 Then check data in cassandra table -
 
 select * from influencers;
+
+Added Ranking -
+
+bin/spark-submit --packages org.json4s:json4s-native_2.11:3.6.3,com.datastax.spark:spark-cassandra-connector_2.11:2.4.0,org.apache.spark:spark-streaming-kafka-0-10_2.11:2.1.1 --master spark://127.0.0.1:7077 --class InfluencersRanking --deploy-mode client /Users/cruise/Documents/developer/affable/target/scala-2.11/affable_2.11-0.1.jar
+
+cassandra table -
+
+create table influencersranking (pk Int, followers Int, rank int, primary key ((pk), rank)) WITH CLUSTERING ORDER BY (rank asc);
+
+
